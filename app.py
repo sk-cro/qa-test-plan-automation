@@ -133,24 +133,9 @@ def create_qa_test_plan(issue_key):
     try:
         logger.info(f"Starting enhanced QA test plan creation for {issue_key}")
         
-        # Step 1: Parse Jira ticket data (with fallback)
+        # Step 1: Parse Jira ticket data
         logger.info(f"Parsing ticket data for {issue_key}")
-        try:
-            ticket_data = ticket_parser.parse_ticket_for_qa_plan(issue_key)
-        except Exception as e:
-            logger.warning(f"Failed to parse ticket {issue_key} from Jira: {e}")
-            logger.info("Creating basic sheet without customization")
-            # Create basic ticket data for fallback
-            ticket_data = {
-                'issue_key': issue_key,
-                'platform': 'Web',  # Default platform
-                'primary_metric': None,
-                'additional_metrics': [],
-                'custom_attributes': [],
-                'requirements': f'QA Test Plan for {issue_key}',
-                'has_custom_attributes': False,
-                'internal_notes': ''
-            }
+        ticket_data = ticket_parser.parse_ticket_for_qa_plan(issue_key)
         
         # Step 2-4: Create the basic Google Sheet
         sheet_info = sheets_manager.create_qa_test_plan(issue_key)
@@ -159,18 +144,13 @@ def create_qa_test_plan(issue_key):
         
         logger.info(f"Basic QA test plan created: {sheet_url}")
         
-        # Step 5: Customize the sheet based on ticket data (with fallback)
+        # Step 5: Customize the sheet based on ticket data
         logger.info(f"Customizing sheet with ticket data")
-        customization_success = False
-        try:
-            customization_success = sheet_customizer.customize_qa_test_plan(sheet_id, ticket_data)
-            if customization_success:
-                logger.info(f"Sheet customization completed successfully for {issue_key}")
-            else:
-                logger.warning(f"Sheet customization failed for {issue_key}, but basic sheet was created")
-        except Exception as e:
-            logger.warning(f"Sheet customization failed for {issue_key}: {e}")
-            logger.info("Basic sheet created without customization")
+        customization_success = sheet_customizer.customize_qa_test_plan(sheet_id, ticket_data)
+        
+        if not customization_success:
+            logger.error(f"Sheet customization failed for {issue_key}")
+            raise Exception(f"Failed to customize sheet for {issue_key}")
         
         # Step 6: Post comment to Jira
         try:
@@ -180,6 +160,14 @@ def create_qa_test_plan(issue_key):
             # Log error but don't fail the entire operation
             # The sheet was created successfully
             logger.error(f"Failed to post comment to Jira: {e}")
+            # Try to post error notification to Jira
+            try:
+                error_message = f"❌ QA Test Plan automation failed: {str(e)}"
+                jira_client.add_comment(issue_key, error_message)
+                logger.info(f"Error notification posted to Jira for {issue_key}")
+            except Exception as comment_error:
+                logger.error(f"Failed to post error notification to Jira: {comment_error}")
+            
             return {
                 'issue_key': issue_key,
                 'sheet_url': sheet_url,
@@ -204,6 +192,15 @@ def create_qa_test_plan(issue_key):
         
     except Exception as e:
         logger.error(f"Failed to create enhanced QA test plan: {e}")
+        
+        # Try to post error notification to Jira
+        try:
+            error_message = f"❌ QA Test Plan automation failed: {str(e)}"
+            jira_client.add_comment(issue_key, error_message)
+            logger.info(f"Error notification posted to Jira for {issue_key}")
+        except Exception as comment_error:
+            logger.error(f"Failed to post error notification to Jira: {comment_error}")
+        
         raise
 
 
