@@ -40,10 +40,21 @@ class JiraTicketParser:
             ticket_data = self.jira_client.get_issue(issue_key)
             
             # Extract basic information
+            description_field = ticket_data.get('fields', {}).get('description', '')
+            
+            # Handle different description formats (string or ADF document)
+            if isinstance(description_field, str):
+                description_text = description_field
+            elif isinstance(description_field, dict):
+                # Convert ADF document to plain text
+                description_text = self._convert_adf_to_text(description_field)
+            else:
+                description_text = str(description_field) if description_field else ''
+            
             parsed_data = {
                 'issue_key': issue_key,
                 'summary': ticket_data.get('fields', {}).get('summary', ''),
-                'description': ticket_data.get('fields', {}).get('description', ''),
+                'description': description_text,
                 'labels': ticket_data.get('fields', {}).get('labels', []),
                 'custom_fields': {},
                 'platform': None,
@@ -268,3 +279,93 @@ class JiraTicketParser:
                 return match.group(1).strip()
         
         return ""
+    
+    def _convert_adf_to_text(self, adf_document):
+        """
+        Convert Atlassian Document Format (ADF) to plain text.
+        
+        Args:
+            adf_document (dict): ADF document structure.
+            
+        Returns:
+            str: Plain text representation.
+        """
+        try:
+            if not isinstance(adf_document, dict):
+                return str(adf_document)
+            
+            content = adf_document.get('content', [])
+            if not content:
+                return ''
+            
+            text_parts = []
+            
+            for node in content:
+                text_parts.append(self._extract_text_from_adf_node(node))
+            
+            return '\n'.join(filter(None, text_parts))
+            
+        except Exception as e:
+            logger.warning(f"Failed to convert ADF to text: {e}")
+            return str(adf_document)
+    
+    def _extract_text_from_adf_node(self, node):
+        """
+        Extract text from a single ADF node.
+        
+        Args:
+            node (dict): ADF node.
+            
+        Returns:
+            str: Extracted text.
+        """
+        try:
+            if not isinstance(node, dict):
+                return ''
+            
+            node_type = node.get('type', '')
+            content = node.get('content', [])
+            text = node.get('text', '')
+            
+            # Handle different node types
+            if node_type == 'paragraph':
+                if content:
+                    paragraph_text = ''.join(self._extract_text_from_adf_node(child) for child in content)
+                    return paragraph_text
+                else:
+                    return text or ''
+            
+            elif node_type == 'text':
+                return text or ''
+            
+            elif node_type == 'heading':
+                level = node.get('attrs', {}).get('level', 1)
+                heading_text = ''.join(self._extract_text_from_adf_node(child) for child in content) if content else text or ''
+                return f"{'#' * level} {heading_text}"
+            
+            elif node_type == 'bulletList' or node_type == 'orderedList':
+                items = []
+                for item in content:
+                    item_content = item.get('content', [])
+                    item_text = ''.join(self._extract_text_from_adf_node(child) for child in item_content)
+                    if item_text:
+                        items.append(f"- {item_text}")
+                return '\n'.join(items)
+            
+            elif node_type == 'listItem':
+                item_text = ''.join(self._extract_text_from_adf_node(child) for child in content)
+                return item_text
+            
+            elif node_type == 'hardBreak':
+                return '\n'
+            
+            else:
+                # For unknown node types, try to extract text from content
+                if content:
+                    return ''.join(self._extract_text_from_adf_node(child) for child in content)
+                else:
+                    return text or ''
+                    
+        except Exception as e:
+            logger.warning(f"Failed to extract text from ADF node: {e}")
+            return ''
