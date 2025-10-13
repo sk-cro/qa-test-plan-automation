@@ -43,13 +43,19 @@ class JiraTicketParser:
             description_field = ticket_data.get('fields', {}).get('description', '')
             
             # Handle different description formats (string or ADF document)
+            logger.info(f"Description field type: {type(description_field)}")
             if isinstance(description_field, str):
                 description_text = description_field
+                logger.info("Description is a string")
             elif isinstance(description_field, dict):
                 # Convert ADF document to plain text
+                logger.info("Description is a dict (ADF), converting to text")
                 description_text = self._convert_adf_to_text(description_field)
             else:
+                logger.info(f"Description is {type(description_field)}, converting to string")
                 description_text = str(description_field) if description_field else ''
+            
+            logger.info(f"Converted description length: {len(description_text)}")
             
             parsed_data = {
                 'issue_key': issue_key,
@@ -166,6 +172,11 @@ class JiraTicketParser:
             dict: Dictionary with 'primary' and 'additional' metrics.
         """
         metrics = {'primary': None, 'additional': []}
+        
+        # Ensure description is a string
+        if not isinstance(description, str):
+            logger.warning(f"Description is not a string: {type(description)}")
+            description = str(description) if description else ''
         
         # Look for [NEW] prefix in description
         new_metrics = re.findall(r'\[NEW\][\s]*([^\n\r\[\]]+)', description, re.IGNORECASE)
