@@ -9,6 +9,8 @@ from flask import Flask, request, jsonify
 from config import Config
 from google_sheets import GoogleSheetsManager
 from jira_client import JiraClient
+from jira_parser import JiraTicketParser
+from sheet_customizer import SheetCustomizer
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +29,8 @@ app = Flask(__name__)
 # Initialize service managers
 sheets_manager = GoogleSheetsManager()
 jira_client = JiraClient()
+ticket_parser = JiraTicketParser()
+sheet_customizer = SheetCustomizer()
 
 
 @app.route('/health', methods=['GET'])
@@ -107,13 +111,15 @@ def jira_webhook():
 
 def create_qa_test_plan(issue_key):
     """
-    Create a QA test plan for a Jira issue.
+    Create a comprehensive QA test plan for a Jira issue.
     
-    This function orchestrates the entire workflow:
-    1. Creates a copy of the template sheet
-    2. Renames it with the Jira issue key
-    3. Moves it to the destination folder
-    4. Posts a comment to Jira with the sheet URL
+    This function orchestrates the enhanced workflow:
+    1. Parse Jira ticket data (platform, metrics, requirements, etc.)
+    2. Create a copy of the template sheet
+    3. Rename it with the Jira issue key
+    4. Move it to the destination folder
+    5. Customize the sheet content based on ticket data
+    6. Post a comment to Jira with the sheet URL
     
     Args:
         issue_key (str): The Jira issue key (e.g., "MTP-1234").
@@ -125,15 +131,27 @@ def create_qa_test_plan(issue_key):
         Exception: If any step fails.
     """
     try:
-        logger.info(f"Starting QA test plan creation for {issue_key}")
+        logger.info(f"Starting enhanced QA test plan creation for {issue_key}")
         
-        # Step 1-3: Create the Google Sheet
+        # Step 1: Parse Jira ticket data
+        logger.info(f"Parsing ticket data for {issue_key}")
+        ticket_data = ticket_parser.parse_ticket_for_qa_plan(issue_key)
+        
+        # Step 2-4: Create the basic Google Sheet
         sheet_info = sheets_manager.create_qa_test_plan(issue_key)
+        sheet_id = sheet_info['sheet_id']
         sheet_url = sheet_info['sheet_url']
         
-        logger.info(f"QA test plan created: {sheet_url}")
+        logger.info(f"Basic QA test plan created: {sheet_url}")
         
-        # Step 4: Post comment to Jira
+        # Step 5: Customize the sheet based on ticket data
+        logger.info(f"Customizing sheet with ticket data")
+        customization_success = sheet_customizer.customize_qa_test_plan(sheet_id, ticket_data)
+        
+        if not customization_success:
+            logger.warning(f"Sheet customization failed for {issue_key}, but basic sheet was created")
+        
+        # Step 6: Post comment to Jira
         try:
             jira_client.post_qa_plan_comment(issue_key, sheet_url)
             logger.info(f"Comment posted to Jira issue {issue_key}")
@@ -145,19 +163,26 @@ def create_qa_test_plan(issue_key):
                 'issue_key': issue_key,
                 'sheet_url': sheet_url,
                 'status': 'partial_success',
-                'message': 'Sheet created but failed to post comment to Jira',
-                'error': str(e)
+                'message': 'Sheet created and customized but failed to post comment to Jira',
+                'error': str(e),
+                'customization_success': customization_success
             }
         
         return {
             'issue_key': issue_key,
             'sheet_url': sheet_url,
             'status': 'success',
-            'message': 'QA test plan created and Jira updated successfully'
+            'message': 'Enhanced QA test plan created and Jira updated successfully',
+            'customization_success': customization_success,
+            'ticket_data': {
+                'platform': ticket_data['platform'],
+                'primary_metric': ticket_data['primary_metric'],
+                'has_custom_attributes': ticket_data['has_custom_attributes']
+            }
         }
         
     except Exception as e:
-        logger.error(f"Failed to create QA test plan: {e}")
+        logger.error(f"Failed to create enhanced QA test plan: {e}")
         raise
 
 
