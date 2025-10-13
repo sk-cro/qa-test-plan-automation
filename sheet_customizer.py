@@ -121,25 +121,41 @@ class SheetCustomizer:
         try:
             logger.info(f"Managing tabs for platform: {platform}")
             
-            # Define which tabs to keep based on platform
-            tabs_to_keep = ['hidden', f'{platform} QA Pass1', 'Complexity & Risk']
+            # Map platform names to sheet names
+            platform_sheet_mapping = {
+                'Web': ['[Optimizely] QA Pass 1', '[Convert] QA Pass 1', '[VWO] QA Pass 1'],
+                'Mobile': ['[Optimizely] QA Pass 1', '[Convert] QA Pass 1', '[VWO] QA Pass 1'],
+                'Backend': ['[Optimizely] QA Pass 1', '[Convert] QA Pass 1', '[VWO] QA Pass 1'],
+                'Email': ['[Convert] QA Pass 1'],
+                'Push': ['[Convert] QA Pass 1'],
+                'SMS': ['[Convert] QA Pass 1']
+            }
+            
+            # Default to keeping all QA Pass sheets for now
+            tabs_to_keep = ['Values', 'Complexity & Risk'] + platform_sheet_mapping.get(platform, ['[Optimizely] QA Pass 1', '[Convert] QA Pass 1', '[VWO] QA Pass 1'])
             
             # Hide/delete non-relevant tabs
             requests = []
             for sheet_name, sheet_info in sheet_metadata.items():
-                if sheet_name.lower() not in [tab.lower() for tab in tabs_to_keep]:
-                    # Check if it's an experiment-specific tab (contains "QA Pass1")
-                    if 'QA Pass1' in sheet_name and platform.lower() not in sheet_name.lower():
-                        # Hide this tab
-                        requests.append({
-                            'updateSheetProperties': {
-                                'properties': {
-                                    'sheetId': sheet_info['id'],
-                                    'hidden': True
-                                },
-                                'fields': 'hidden'
-                            }
-                        })
+                # Always keep hidden sheets and complexity & risk
+                if sheet_info.get('hidden', False) or 'Complexity' in sheet_name or 'Values' in sheet_name:
+                    continue
+                    
+                # Check if this sheet should be kept
+                should_keep = any(tab.lower() in sheet_name.lower() for tab in tabs_to_keep)
+                
+                if not should_keep:
+                    # Hide this tab
+                    requests.append({
+                        'updateSheetProperties': {
+                            'properties': {
+                                'sheetId': sheet_info['id'],
+                                'hidden': True
+                            },
+                            'fields': 'hidden'
+                        }
+                    })
+                    logger.info(f"Will hide sheet: {sheet_name}")
             
             if requests:
                 self.sheets_service.spreadsheets().batchUpdate(
@@ -204,37 +220,44 @@ class SheetCustomizer:
             logger.info(f"Adding {len(custom_attributes)} custom attributes")
             
             # Find the Custom Attribute section and insert attributes
-            # Try multiple possible ranges for custom attributes
-            possible_base_ranges = ['Sheet1!B16', 'Sheet1!B15', 'Sheet1!B17', 'Sheet1!C16']
+            # Try to insert into the main QA Pass sheets
+            qa_sheets = ['[Optimizely] QA Pass 1', '[Convert] QA Pass 1', '[VWO] QA Pass 1']
             
             for i, attribute in enumerate(custom_attributes):
                 attribute_inserted = False
                 
-                for base_range in possible_base_ranges:
-                    try:
-                        # Extract the column and base row from the range
-                        column = base_range.split('!')[1].split(':')[0][0]  # Get column letter
-                        base_row = int(base_range.split('!')[1].split(':')[0][1:])  # Get base row number
-                        
-                        range_name = f"Sheet1!{column}{base_row + i}"
-                        
-                        self.sheets_service.spreadsheets().values().update(
-                            spreadsheetId=sheet_id,
-                            range=range_name,
-                            valueInputOption='RAW',
-                            body={'values': [[attribute]]}
-                        ).execute()
-                        
-                        logger.info(f"Custom attribute '{attribute}' inserted at {range_name}")
-                        attribute_inserted = True
+                for sheet_name in qa_sheets:
+                    # Try multiple possible ranges for custom attributes
+                    possible_base_ranges = [f'{sheet_name}!B16', f'{sheet_name}!B15', f'{sheet_name}!B17', f'{sheet_name}!C16']
+                    
+                    for base_range in possible_base_ranges:
+                        try:
+                            # Extract the column and base row from the range
+                            column = base_range.split('!')[1].split(':')[0][0]  # Get column letter
+                            base_row = int(base_range.split('!')[1].split(':')[0][1:])  # Get base row number
+                            
+                            range_name = f"{sheet_name}!{column}{base_row + i}"
+                            
+                            self.sheets_service.spreadsheets().values().update(
+                                spreadsheetId=sheet_id,
+                                range=range_name,
+                                valueInputOption='RAW',
+                                body={'values': [[attribute]]}
+                            ).execute()
+                            
+                            logger.info(f"Custom attribute '{attribute}' inserted at {range_name}")
+                            attribute_inserted = True
+                            break
+                            
+                        except HttpError as e:
+                            if "Unable to parse range" in str(e):
+                                logger.info(f"Range {range_name} not valid, trying next")
+                                continue
+                            else:
+                                raise
+                    
+                    if attribute_inserted:
                         break
-                        
-                    except HttpError as e:
-                        if "Unable to parse range" in str(e):
-                            logger.info(f"Range {range_name} not valid, trying next")
-                            continue
-                        else:
-                            raise
                 
                 if not attribute_inserted:
                     logger.warning(f"Could not insert custom attribute '{attribute}', skipping")
@@ -348,29 +371,36 @@ class SheetCustomizer:
             formatted_requirements = self._format_requirements_text(requirements)
             
             # Insert into Spec Requirements section
-            # First, try to find the right cell for requirements
+            # Try to insert into the main QA Pass sheets
+            qa_sheets = ['[Optimizely] QA Pass 1', '[Convert] QA Pass 1', '[VWO] QA Pass 1']
+            
             try:
-                # Try common ranges for requirements
-                possible_ranges = ['Sheet1!B25', 'Sheet1!B20', 'Sheet1!B30', 'Sheet1!C25']
                 range_updated = False
                 
-                for range_name in possible_ranges:
-                    try:
-                        self.sheets_service.spreadsheets().values().update(
-                            spreadsheetId=sheet_id,
-                            range=range_name,
-                            valueInputOption='RAW',
-                            body={'values': [[formatted_requirements]]}
-                        ).execute()
-                        logger.info(f"Requirements inserted at {range_name}")
-                        range_updated = True
+                for sheet_name in qa_sheets:
+                    # Try common ranges for requirements
+                    possible_ranges = [f'{sheet_name}!B25', f'{sheet_name}!B20', f'{sheet_name}!B30', f'{sheet_name}!C25']
+                    
+                    for range_name in possible_ranges:
+                        try:
+                            self.sheets_service.spreadsheets().values().update(
+                                spreadsheetId=sheet_id,
+                                range=range_name,
+                                valueInputOption='RAW',
+                                body={'values': [[formatted_requirements]]}
+                            ).execute()
+                            logger.info(f"Requirements inserted at {range_name}")
+                            range_updated = True
+                            break
+                        except HttpError as e:
+                            if "Unable to parse range" in str(e):
+                                logger.info(f"Range {range_name} not valid, trying next")
+                                continue
+                            else:
+                                raise
+                    
+                    if range_updated:
                         break
-                    except HttpError as e:
-                        if "Unable to parse range" in str(e):
-                            logger.info(f"Range {range_name} not valid, trying next")
-                            continue
-                        else:
-                            raise
                 
                 if not range_updated:
                     logger.warning("Could not find valid range for requirements, skipping")
