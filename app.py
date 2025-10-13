@@ -133,9 +133,24 @@ def create_qa_test_plan(issue_key):
     try:
         logger.info(f"Starting enhanced QA test plan creation for {issue_key}")
         
-        # Step 1: Parse Jira ticket data
+        # Step 1: Parse Jira ticket data (with fallback)
         logger.info(f"Parsing ticket data for {issue_key}")
-        ticket_data = ticket_parser.parse_ticket_for_qa_plan(issue_key)
+        try:
+            ticket_data = ticket_parser.parse_ticket_for_qa_plan(issue_key)
+        except Exception as e:
+            logger.warning(f"Failed to parse ticket {issue_key} from Jira: {e}")
+            logger.info("Creating basic sheet without customization")
+            # Create basic ticket data for fallback
+            ticket_data = {
+                'issue_key': issue_key,
+                'platform': 'Web',  # Default platform
+                'primary_metric': None,
+                'additional_metrics': [],
+                'custom_attributes': [],
+                'requirements': f'QA Test Plan for {issue_key}',
+                'has_custom_attributes': False,
+                'internal_notes': ''
+            }
         
         # Step 2-4: Create the basic Google Sheet
         sheet_info = sheets_manager.create_qa_test_plan(issue_key)
@@ -144,12 +159,18 @@ def create_qa_test_plan(issue_key):
         
         logger.info(f"Basic QA test plan created: {sheet_url}")
         
-        # Step 5: Customize the sheet based on ticket data
+        # Step 5: Customize the sheet based on ticket data (with fallback)
         logger.info(f"Customizing sheet with ticket data")
-        customization_success = sheet_customizer.customize_qa_test_plan(sheet_id, ticket_data)
-        
-        if not customization_success:
-            logger.warning(f"Sheet customization failed for {issue_key}, but basic sheet was created")
+        customization_success = False
+        try:
+            customization_success = sheet_customizer.customize_qa_test_plan(sheet_id, ticket_data)
+            if customization_success:
+                logger.info(f"Sheet customization completed successfully for {issue_key}")
+            else:
+                logger.warning(f"Sheet customization failed for {issue_key}, but basic sheet was created")
+        except Exception as e:
+            logger.warning(f"Sheet customization failed for {issue_key}: {e}")
+            logger.info("Basic sheet created without customization")
         
         # Step 6: Post comment to Jira
         try:
