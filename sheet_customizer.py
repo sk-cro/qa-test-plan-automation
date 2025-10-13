@@ -204,18 +204,40 @@ class SheetCustomizer:
             logger.info(f"Adding {len(custom_attributes)} custom attributes")
             
             # Find the Custom Attribute section and insert attributes
-            # This would need to be customized based on your template structure
+            # Try multiple possible ranges for custom attributes
+            possible_base_ranges = ['Sheet1!B16', 'Sheet1!B15', 'Sheet1!B17', 'Sheet1!C16']
+            
             for i, attribute in enumerate(custom_attributes):
-                # Insert attribute in the appropriate cell
-                # You'll need to adjust the range based on your template
-                range_name = f"Sheet1!B{16 + i}"  # Adjust based on template
+                attribute_inserted = False
                 
-                self.sheets_service.spreadsheets().values().update(
-                    spreadsheetId=sheet_id,
-                    range=range_name,
-                    valueInputOption='RAW',
-                    body={'values': [[attribute]]}
-                ).execute()
+                for base_range in possible_base_ranges:
+                    try:
+                        # Extract the column and base row from the range
+                        column = base_range.split('!')[1].split(':')[0][0]  # Get column letter
+                        base_row = int(base_range.split('!')[1].split(':')[0][1:])  # Get base row number
+                        
+                        range_name = f"Sheet1!{column}{base_row + i}"
+                        
+                        self.sheets_service.spreadsheets().values().update(
+                            spreadsheetId=sheet_id,
+                            range=range_name,
+                            valueInputOption='RAW',
+                            body={'values': [[attribute]]}
+                        ).execute()
+                        
+                        logger.info(f"Custom attribute '{attribute}' inserted at {range_name}")
+                        attribute_inserted = True
+                        break
+                        
+                    except HttpError as e:
+                        if "Unable to parse range" in str(e):
+                            logger.info(f"Range {range_name} not valid, trying next")
+                            continue
+                        else:
+                            raise
+                
+                if not attribute_inserted:
+                    logger.warning(f"Could not insert custom attribute '{attribute}', skipping")
             
             logger.info("Successfully added custom attributes")
             
@@ -326,15 +348,36 @@ class SheetCustomizer:
             formatted_requirements = self._format_requirements_text(requirements)
             
             # Insert into Spec Requirements section
-            # Adjust range based on your template structure
-            range_name = 'Sheet1!B25'  # Example range
-            
-            self.sheets_service.spreadsheets().values().update(
-                spreadsheetId=sheet_id,
-                range=range_name,
-                valueInputOption='RAW',
-                body={'values': [[formatted_requirements]]}
-            ).execute()
+            # First, try to find the right cell for requirements
+            try:
+                # Try common ranges for requirements
+                possible_ranges = ['Sheet1!B25', 'Sheet1!B20', 'Sheet1!B30', 'Sheet1!C25']
+                range_updated = False
+                
+                for range_name in possible_ranges:
+                    try:
+                        self.sheets_service.spreadsheets().values().update(
+                            spreadsheetId=sheet_id,
+                            range=range_name,
+                            valueInputOption='RAW',
+                            body={'values': [[formatted_requirements]]}
+                        ).execute()
+                        logger.info(f"Requirements inserted at {range_name}")
+                        range_updated = True
+                        break
+                    except HttpError as e:
+                        if "Unable to parse range" in str(e):
+                            logger.info(f"Range {range_name} not valid, trying next")
+                            continue
+                        else:
+                            raise
+                
+                if not range_updated:
+                    logger.warning("Could not find valid range for requirements, skipping")
+                    
+            except Exception as e:
+                logger.error(f"Failed to insert requirements: {e}")
+                raise
             
             # If requirements are too long, add more rows
             if len(formatted_requirements.split('\n')) > 3:
