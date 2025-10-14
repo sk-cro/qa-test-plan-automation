@@ -33,6 +33,71 @@ ticket_parser = JiraTicketParser()
 sheet_customizer = SheetCustomizer()
 
 
+def _qa_plan_already_exists(issue_key):
+    """
+    Check if a QA test plan comment already exists for this issue.
+    
+    Args:
+        issue_key (str): The Jira issue key (e.g., "MTP-1234").
+        
+    Returns:
+        bool: True if QA test plan already exists, False otherwise.
+    """
+    try:
+        logger.info(f"Checking if QA test plan already exists for {issue_key}")
+        
+        # Get issue details to check existing comments
+        issue_data = jira_client.get_issue(issue_key)
+        comments = issue_data.get('fields', {}).get('comment', {}).get('comments', [])
+        
+        # Check if any comment contains "QA Test Plan has been created"
+        for comment in comments:
+            comment_body = comment.get('body', {})
+            if isinstance(comment_body, dict):
+                # Extract text from comment body (Jira uses structured content)
+                comment_text = _extract_text_from_jira_body(comment_body)
+            else:
+                comment_text = str(comment_body)
+            
+            if "QA Test Plan has been created:" in comment_text:
+                logger.info(f"Found existing QA test plan comment for {issue_key}")
+                return True
+        
+        logger.info(f"No existing QA test plan found for {issue_key}")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error checking for existing QA test plan: {e}")
+        # If we can't check, assume it doesn't exist to avoid blocking legitimate requests
+        return False
+
+
+def _extract_text_from_jira_body(body):
+    """
+    Extract plain text from Jira's structured comment body.
+    
+    Args:
+        body (dict): Jira comment body structure.
+        
+    Returns:
+        str: Plain text content.
+    """
+    if not isinstance(body, dict):
+        return str(body)
+    
+    text_parts = []
+    
+    # Handle Jira's document structure
+    content = body.get('content', [])
+    for item in content:
+        if item.get('type') == 'paragraph':
+            for content_item in item.get('content', []):
+                if content_item.get('type') == 'text':
+                    text_parts.append(content_item.get('text', ''))
+    
+    return ' '.join(text_parts)
+
+
 def is_project_allowed(issue_key):
     """
     Check if the issue's project is in the allowed projects list.
@@ -123,12 +188,20 @@ def jira_webhook():
         
         status_changed_to_qa = False
         for item in items:
-            if item.get('field') == 'status' and item.get('toString', '').lower() == 'ready for qa':
-                status_changed_to_qa = True
-                break
+            if item.get('field') == 'status':
+                from_status = item.get('fromString', '').strip()
+                to_status = item.get('toString', '').strip()
+                
+                # Check if this is actually a status change TO "Ready for QA"
+                # and NOT from "Ready for QA" (to prevent loops)
+                if (to_status.lower() == 'ready for qa' and 
+                    from_status.lower() != 'ready for qa'):
+                    status_changed_to_qa = True
+                    logger.info(f"Status change detected: '{from_status}' → '{to_status}'")
+                    break
         
         if not status_changed_to_qa:
-            logger.info(f"Issue {issue_key} status not changed to 'Ready for QA', ignoring")
+            logger.info(f"Issue {issue_key} - No valid status change to 'Ready for QA' detected, ignoring")
             return jsonify({'message': 'Status not changed to Ready for QA'}), 200
         
         logger.info(f"Processing issue {issue_key} - Status changed to 'Ready for QA'")
@@ -166,6 +239,15 @@ def create_qa_test_plan(issue_key):
     """
     try:
         logger.info(f"Starting enhanced QA test plan creation for {issue_key}")
+        
+        # Check if QA test plan already exists for this issue
+        if _qa_plan_already_exists(issue_key):
+            logger.info(f"QA test plan already exists for {issue_key}, skipping creation")
+            return {
+                'issue_key': issue_key,
+                'status': 'skipped',
+                'message': 'QA test plan already exists for this issue'
+            }
         
         # Step 1: Parse Jira ticket data
         logger.info(f"Parsing ticket data for {issue_key}")
