@@ -33,6 +33,31 @@ ticket_parser = JiraTicketParser()
 sheet_customizer = SheetCustomizer()
 
 
+def is_project_allowed(issue_key):
+    """
+    Check if the issue's project is in the allowed projects list.
+    
+    Args:
+        issue_key (str): The Jira issue key (e.g., "MTP-1234").
+        
+    Returns:
+        bool: True if the project is allowed, False otherwise.
+    """
+    if not issue_key:
+        return False
+    
+    # Extract project key from issue key (e.g., "MTP" from "MTP-1234")
+    project_key = issue_key.split('-')[0] if '-' in issue_key else issue_key
+    
+    # If ALLOWED_PROJECTS is empty or contains empty string, allow all projects
+    allowed_projects = [p.strip() for p in Config.ALLOWED_PROJECTS if p.strip()]
+    
+    if not allowed_projects:
+        return True
+    
+    return project_key in allowed_projects
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """
@@ -82,6 +107,15 @@ def jira_webhook():
         if not issue_key:
             logger.error("No issue key found in webhook payload")
             return jsonify({'error': 'No issue key found'}), 400
+        
+        # Check if the project is allowed
+        if not is_project_allowed(issue_key):
+            project_key = issue_key.split('-')[0] if '-' in issue_key else issue_key
+            logger.info(f"Ignoring issue {issue_key} from project {project_key} (not in allowed projects: {Config.ALLOWED_PROJECTS})")
+            return jsonify({
+                'message': f'Project {project_key} is not in the allowed projects list',
+                'allowed_projects': Config.ALLOWED_PROJECTS
+            }), 200
         
         # Check if status changed to "Ready for QA"
         changelog = payload.get('changelog', {})
@@ -223,6 +257,15 @@ def test_create():
         
         issue_key = data['issue_key']
         logger.info(f"Test endpoint called for issue: {issue_key}")
+        
+        # Check if the project is allowed
+        if not is_project_allowed(issue_key):
+            project_key = issue_key.split('-')[0] if '-' in issue_key else issue_key
+            logger.warning(f"Rejecting test request for issue {issue_key} from project {project_key} (not in allowed projects: {Config.ALLOWED_PROJECTS})")
+            return jsonify({
+                'error': f'Project {project_key} is not in the allowed projects list',
+                'allowed_projects': Config.ALLOWED_PROJECTS
+            }), 403
         
         result = create_qa_test_plan(issue_key)
         

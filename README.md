@@ -7,6 +7,7 @@ A serverless Python application that automatically generates QA test plans in Go
 - **Automated Workflow**: Triggered by Jira webhooks when tickets move to "Ready for QA"
 - **Google Sheets Integration**: Creates test plan sheets from a template
 - **Jira Integration**: Posts comments with sheet URLs back to Jira tickets
+- **Project Restrictions**: Configurable to only process issues from specific Jira projects (currently restricted to MTP project)
 - **Serverless Ready**: Structured for AWS Lambda or Google Cloud Functions
 - **Comprehensive Logging**: Detailed logging for monitoring and debugging
 - **Error Handling**: Robust error handling throughout the application
@@ -65,6 +66,9 @@ DESTINATION_FOLDER_ID=1ZDG-Gdx9iTc-UFqje2YZtUF3vJya4MeG
 
 # Application Settings
 LOG_LEVEL=INFO
+
+# Project Restrictions (comma-separated list of allowed Jira project keys)
+ALLOWED_PROJECTS=MTP
 ```
 
 ### 4. Google Credentials Setup

@@ -36,6 +36,10 @@ class Config:
     # Application Settings
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     
+    # Project Restrictions
+    # Only process issues from these Jira projects (leave empty for all projects)
+    ALLOWED_PROJECTS = os.getenv('ALLOWED_PROJECTS', 'MTP').split(',')
+    
     @staticmethod
     def validate():
         """Validate that all required configuration is present."""
