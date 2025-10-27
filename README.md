@@ -11,6 +11,7 @@ A serverless Python application that automatically generates QA test plans in Go
 - **Serverless Ready**: Structured for AWS Lambda or Google Cloud Functions
 - **Comprehensive Logging**: Detailed logging for monitoring and debugging
 - **Error Handling**: Robust error handling throughout the application
+- **Duplicate Prevention**: Automatically skips creating sheets for tickets that already have a test plan
 
 ## Project Structure
 
@@ -159,12 +160,13 @@ curl http://localhost:5000/health
 
 1. **Trigger**: Jira ticket status changes to "Ready for QA"
 2. **Webhook**: Jira sends POST request to `/webhook` endpoint
-3. **Authentication**: Application authenticates with Google APIs
-4. **Sheet Creation**: 
+3. **Duplicate Check**: Checks if a test plan already exists for the ticket
+4. **Authentication**: Application authenticates with Google APIs
+5. **Sheet Creation**: 
    - Copies template sheet
    - Renames to `{ISSUE-KEY} - QA Test Plan`
    - Moves to destination folder
-5. **Jira Update**: Posts comment with sheet URL to Jira ticket
+6. **Jira Update**: Posts comment with sheet URL to Jira ticket
 
 ## API Endpoints
 
@@ -256,6 +258,11 @@ Logs include timestamps, module names, and log levels for easy debugging.
 
 ## Future Enhancements
 
+- Automated sheet customization based on Jira ticket data
+  - Platform-specific tab management
+  - Metric insertion from ticket descriptions
+  - Requirements extraction and insertion
+  - Custom attributes handling
 - Webhook signature verification for security
 - Support for multiple Jira projects/workflows
 - Customizable sheet templates per project
