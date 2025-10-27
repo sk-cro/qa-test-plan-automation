@@ -1,6 +1,6 @@
 # QA Test Plan Automation
 
-A serverless Python application that automatically generates QA test plans in Google Sheets when Universal ticket is moved to "Selected For Development" status.
+A serverless Python application that automatically generates QA test plans in Google Sheets when a Jira ticket is moved to "Selected For Development" status.
 
 ## Features
 
