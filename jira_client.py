@@ -254,12 +254,13 @@ class JiraClient:
             logger.warning(f"Failed to convert ADF to text: {e}")
             return str(adf_document)
     
-    def _extract_text_from_adf_node(self, node):
+    def _extract_text_from_adf_node(self, node, depth=0):
         """
         Extract text from a single ADF node.
         
         Args:
             node (dict): ADF node.
+            depth (int): Current nesting depth.
             
         Returns:
             str: Extracted text.
@@ -275,7 +276,7 @@ class JiraClient:
             # Handle different node types
             if node_type == 'paragraph':
                 if content:
-                    paragraph_text = ''.join(self._extract_text_from_adf_node(child) for child in content)
+                    paragraph_text = ''.join(self._extract_text_from_adf_node(child, depth) for child in content)
                     return paragraph_text
                 else:
                     return text or ''
@@ -285,14 +286,14 @@ class JiraClient:
             
             elif node_type == 'heading':
                 level = node.get('attrs', {}).get('level', 1)
-                heading_text = ''.join(self._extract_text_from_adf_node(child) for child in content) if content else text or ''
+                heading_text = ''.join(self._extract_text_from_adf_node(child, depth) for child in content) if content else text or ''
                 return f"{'#' * level} {heading_text}"
             
             elif node_type == 'bulletList':
                 items = []
                 for item in content:
                     item_content = item.get('content', [])
-                    item_text = ''.join(self._extract_text_from_adf_node(child) for child in item_content)
+                    item_text = ''.join(self._extract_text_from_adf_node(child, depth) for child in item_content)
                     if item_text:
                         items.append(f"- {item_text}")
                 return '\n'.join(items)
@@ -301,7 +302,7 @@ class JiraClient:
                 items = []
                 for index, item in enumerate(content, start=1):
                     item_content = item.get('content', [])
-                    item_text = ''.join(self._extract_text_from_adf_node(child) for child in item_content)
+                    item_text = ''.join(self._extract_text_from_adf_node(child, depth) for child in item_content)
                     if item_text:
                         items.append(f"{index}. {item_text}")
                 return '\n'.join(items)
@@ -318,7 +319,7 @@ class JiraClient:
             else:
                 # For unknown node types, try to extract text from content
                 if content:
-                    return ''.join(self._extract_text_from_adf_node(child) for child in content)
+                    return ''.join(self._extract_text_from_adf_node(child, depth) for child in content)
                 else:
                     return text or ''
                     
