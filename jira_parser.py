@@ -81,9 +81,6 @@ class JiraTicketParser:
                 logger.info(f"No Goals field found or empty for issue: {issue_key}")
                 return []
             
-            # Log the converted text for debugging
-            logger.info(f"Goals field text (first 500 chars): {goals_text[:500]}")
-            
             # Parse numbered goals using reliable regex pattern
             # Keep the numbering detection but strip prefix before inserting into sheet
             goal_pattern = r'(\d+\.\s+.+?)(?=\d+\.\s+|$)'
