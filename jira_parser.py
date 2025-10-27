@@ -84,19 +84,36 @@ class JiraTicketParser:
             # Log the converted text for debugging
             logger.info(f"Goals field text (first 500 chars): {goals_text[:500]}")
             
-            # Parse numbered goals
-            # Pattern: Number followed by period and space, then all content until next number or end
+            # Parse goals by splitting on newlines and grouping
+            # Look for text patterns that indicate a new goal starts
+            # Goals are separated by blank lines or start with specific patterns
+            lines = goals_text.split('\n')
+            
             goals = []
+            current_goal = []
             
-            # Find all goal patterns
-            # Looking for patterns like "1. ", "2. ", "3. ", etc.
-            goal_pattern = r'(\d+\.\s+.+?)(?=\d+\.\s+|$)'
-            matches = re.findall(goal_pattern, goals_text, re.DOTALL)
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    # Blank line - end current goal if we have content
+                    if current_goal:
+                        goals.append('\n'.join(current_goal))
+                        current_goal = []
+                elif line and (line.startswith('Online Store') or line.startswith('Homepage') or 
+                              'Platform ID:' in line or 'Page URL' in line):
+                    # If we encounter a new top-level item and we have content, save current goal
+                    if current_goal and current_goal:
+                        goals.append('\n'.join(current_goal))
+                        current_goal = [line]
+                    else:
+                        current_goal.append(line)
+                else:
+                    # Continue current goal
+                    current_goal.append(line)
             
-            for match in matches:
-                goal_text = match.strip()
-                if goal_text:
-                    goals.append(goal_text)
+            # Add last goal if exists
+            if current_goal:
+                goals.append('\n'.join(current_goal))
             
             logger.info(f"Parsed {len(goals)} goals from Goals field")
             return goals

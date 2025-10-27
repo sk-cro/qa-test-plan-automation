@@ -224,12 +224,13 @@ class JiraClient:
             logger.error(f"Error fetching Goals field: {e}")
             return ''
     
-    def _convert_adf_to_text(self, adf_document):
+    def _convert_adf_to_text(self, adf_document, depth=0):
         """
         Convert Atlassian Document Format (ADF) to plain text.
         
         Args:
             adf_document (dict): ADF document structure.
+            depth (int): Current nesting depth.
             
         Returns:
             str: Plain text representation.
@@ -245,7 +246,7 @@ class JiraClient:
             text_parts = []
             
             for node in content:
-                text_parts.append(self._extract_text_from_adf_node(node))
+                text_parts.append(self._extract_text_from_adf_node(node, depth))
             
             return '\n'.join(filter(None, text_parts))
             
@@ -298,11 +299,11 @@ class JiraClient:
             
             elif node_type == 'orderedList':
                 items = []
-                for index, item in enumerate(content, start=1):
+                for item in content:
                     item_content = item.get('content', [])
                     item_text = ''.join(self._extract_text_from_adf_node(child) for child in item_content)
                     if item_text:
-                        items.append(f"{index}. {item_text}")
+                        items.append(item_text)
                 return '\n'.join(items)
             
             elif node_type == 'listItem':
