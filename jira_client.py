@@ -287,13 +287,22 @@ class JiraClient:
                 heading_text = ''.join(self._extract_text_from_adf_node(child) for child in content) if content else text or ''
                 return f"{'#' * level} {heading_text}"
             
-            elif node_type == 'bulletList' or node_type == 'orderedList':
+            elif node_type == 'bulletList':
                 items = []
                 for item in content:
                     item_content = item.get('content', [])
                     item_text = ''.join(self._extract_text_from_adf_node(child) for child in item_content)
                     if item_text:
                         items.append(f"- {item_text}")
+                return '\n'.join(items)
+            
+            elif node_type == 'orderedList':
+                items = []
+                for index, item in enumerate(content, start=1):
+                    item_content = item.get('content', [])
+                    item_text = ''.join(self._extract_text_from_adf_node(child) for child in item_content)
+                    if item_text:
+                        items.append(f"{index}. {item_text}")
                 return '\n'.join(items)
             
             elif node_type == 'listItem':
