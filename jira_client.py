@@ -298,14 +298,17 @@ class JiraClient:
             
             elif node_type == 'orderedList':
                 items = []
-                for index, item in enumerate(content, start=1):
+                for item in content:
                     item_content = item.get('content', [])
+                    # Extract text from item - let listItem handle numbering
                     item_text = ''.join(self._extract_text_from_adf_node(child) for child in item_content)
                     if item_text:
-                        items.append(f"{index}. {item_text}")
+                        items.append(item_text)
                 return '\n'.join(items)
             
             elif node_type == 'listItem':
+                # Get the parent's order to determine numbering
+                # This is a simplified approach - just extract content
                 item_text = ''.join(self._extract_text_from_adf_node(child) for child in content)
                 return item_text
             

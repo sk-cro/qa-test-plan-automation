@@ -50,6 +50,12 @@ class SheetCustomizer:
                 logger.info("No goals to insert, skipping customization")
                 return True
             
+            # Filter out empty goals
+            goals = [g.strip() for g in goals if g.strip()]
+            if not goals:
+                logger.info("No non-empty goals after filtering, skipping customization")
+                return True
+            
             # Find the tab ID
             tab_id = self._get_tab_id(sheet_id, tab_name)
             if tab_id is None:
