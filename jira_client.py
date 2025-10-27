@@ -194,22 +194,21 @@ class JiraClient:
             issue_data = self.get_issue(issue_key)
             fields = issue_data.get('fields', {})
             
-            # Try to find the Goals field
-            # It could be a custom field or a standard field
-            # Search through all fields for 'Goals'
-            for field_name, field_value in fields.items():
-                if 'goal' in field_name.lower() and field_value:
-                    logger.info(f"Found Goals field: {field_name}")
-                    # Handle different field types
-                    if isinstance(field_value, str):
-                        return field_value
-                    elif isinstance(field_value, dict):
-                        # Handle ADF document format
-                        if 'content' in field_value:
-                            return self._convert_adf_to_text(field_value)
-                        return str(field_value)
-                    else:
-                        return str(field_value) if field_value else ''
+            # Look for the Goals custom field (customfield_10040)
+            goals_field = fields.get('customfield_10040')
+            
+            if goals_field:
+                logger.info(f"Found Goals field in customfield_10040")
+                # Handle different field types
+                if isinstance(goals_field, str):
+                    return goals_field
+                elif isinstance(goals_field, dict):
+                    # Handle ADF document format
+                    if 'content' in goals_field:
+                        return self._convert_adf_to_text(goals_field)
+                    return str(goals_field)
+                else:
+                    return str(goals_field) if goals_field else ''
             
             logger.warning(f"No Goals field found for issue: {issue_key}")
             return ''
