@@ -199,13 +199,20 @@ class JiraClient:
             
             if goals_field:
                 logger.info(f"Found Goals field in customfield_10040")
+                # Log the raw field structure
+                logger.info(f"Goals field type: {type(goals_field)}")
+                if isinstance(goals_field, dict):
+                    logger.info(f"Goals field keys: {list(goals_field.keys())[:5]}")
+                
                 # Handle different field types
                 if isinstance(goals_field, str):
                     return goals_field
                 elif isinstance(goals_field, dict):
                     # Handle ADF document format
                     if 'content' in goals_field:
-                        return self._convert_adf_to_text(goals_field)
+                        converted_text = self._convert_adf_to_text(goals_field)
+                        logger.info(f"ADF converted (first 200 chars): {converted_text[:200]}")
+                        return converted_text
                     return str(goals_field)
                 else:
                     return str(goals_field) if goals_field else ''

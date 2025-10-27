@@ -81,6 +81,9 @@ class JiraTicketParser:
                 logger.info(f"No Goals field found or empty for issue: {issue_key}")
                 return []
             
+            # Log the converted text for debugging
+            logger.info(f"Goals field text (first 500 chars): {goals_text[:500]}")
+            
             # Parse numbered goals
             # Pattern: Number followed by period and space, then all content until next number or end
             goals = []
