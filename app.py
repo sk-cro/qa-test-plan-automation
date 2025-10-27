@@ -9,6 +9,8 @@ from flask import Flask, request, jsonify
 from config import Config
 from google_sheets import GoogleSheetsManager
 from jira_client import JiraClient
+from jira_parser import JiraTicketParser
+from sheet_customizer import SheetCustomizer
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +29,8 @@ app = Flask(__name__)
 # Initialize service managers
 sheets_manager = GoogleSheetsManager()
 jira_client = JiraClient()
+ticket_parser = JiraTicketParser()
+sheet_customizer = SheetCustomizer()
 
 
 def _qa_plan_already_exists(issue_key):
@@ -214,13 +218,15 @@ def jira_webhook():
 
 def create_qa_test_plan(issue_key):
     """
-    Create a basic QA test plan for a Jira issue.
+    Create a QA test plan for a Jira issue with Goals field customization.
     
-    This function orchestrates the basic workflow:
+    This function orchestrates the workflow:
     1. Create a copy of the template sheet
     2. Rename it with the Jira issue key
     3. Move it to the destination folder
-    4. Post a comment to Jira with the sheet URL
+    4. Parse Goals field and platform from Jira
+    5. Insert goals into the appropriate platform tab at row 28
+    6. Post a comment to Jira with the sheet URL
     
     Args:
         issue_key (str): The Jira issue key (e.g., "MTP-1234").
@@ -250,6 +256,30 @@ def create_qa_test_plan(issue_key):
         
         logger.info(f"QA test plan created: {sheet_url}")
         
+        # Parse platform and goals from Jira
+        platform = ticket_parser.extract_platform_from_labels(issue_key)
+        goals = ticket_parser.parse_goals_field(issue_key)
+        
+        logger.info(f"Platform detected: {platform}")
+        logger.info(f"Goals found: {len(goals)}")
+        
+        # Customize the sheet with goals if any exist
+        if goals:
+            try:
+                sheet_customizer.customize_sheet_with_goals(sheet_id, platform, goals)
+                logger.info(f"Successfully customized sheet with {len(goals)} goals")
+            except Exception as e:
+                logger.error(f"Failed to customize sheet with goals: {e}")
+                # Continue anyway - sheet was created successfully
+        else:
+            # Post warning to Jira if no goals found
+            try:
+                warning_message = "Warning: No Goals field found in ticket. Sheet created without goals."
+                jira_client.add_comment(issue_key, warning_message)
+                logger.info(f"Warning posted to Jira for {issue_key}")
+            except Exception as comment_error:
+                logger.error(f"Failed to post warning to Jira: {comment_error}")
+        
         # Post comment to Jira
         try:
             jira_client.post_qa_plan_comment(issue_key, sheet_url)
@@ -278,7 +308,9 @@ def create_qa_test_plan(issue_key):
             'issue_key': issue_key,
             'sheet_url': sheet_url,
             'status': 'success',
-            'message': 'QA test plan created and Jira updated successfully'
+            'message': 'QA test plan created and Jira updated successfully',
+            'platform': platform,
+            'goals_inserted': len(goals) if goals else 0
         }
         
     except Exception as e:

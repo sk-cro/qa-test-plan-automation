@@ -6,6 +6,9 @@ A serverless Python application that automatically generates QA test plans in Go
 
 - **Automated Workflow**: Triggered by Jira webhooks when tickets move to "Ready for QA"
 - **Google Sheets Integration**: Creates test plan sheets from a template
+- **Goals Field Parsing**: Automatically parses numbered goals from Jira "Goals" field
+- **Platform Detection**: Identifies testing platform (Convert, Optimizely, or VWO) from Jira labels
+- **Dynamic Content Insertion**: Inserts goals into the appropriate platform tab at row 28, column B
 - **Jira Integration**: Posts comments with sheet URLs back to Jira tickets
 - **Project Restrictions**: Configurable to only process issues from specific Jira projects (currently restricted to MTP project)
 - **Serverless Ready**: Structured for AWS Lambda or Google Cloud Functions
@@ -22,6 +25,8 @@ A serverless Python application that automatically generates QA test plans in Go
 ├── google_auth.py          # Google API authentication
 ├── google_sheets.py        # Google Sheets/Drive operations
 ├── jira_client.py          # Jira API client
+├── jira_parser.py          # Jira ticket parser for platform and goals
+├── sheet_customizer.py     # Google Sheet customization logic
 ├── serverless_aws.py       # AWS Lambda handler
 ├── serverless_gcp.py       # Google Cloud Functions handler
 ├── requirements.txt        # Python dependencies
@@ -166,7 +171,12 @@ curl http://localhost:5000/health
    - Copies template sheet
    - Renames to `{ISSUE-KEY} - QA Test Plan`
    - Moves to destination folder
-6. **Jira Update**: Posts comment with sheet URL to Jira ticket
+6. **Content Customization**:
+   - Extracts platform from Jira labels (Convert, Optimizely, or VWO)
+   - Parses Goals field into numbered sections
+   - Selects appropriate platform tab
+   - Inserts goals starting at row 28, column B
+7. **Jira Update**: Posts comment with sheet URL to Jira ticket
 
 ## API Endpoints
 
@@ -258,11 +268,11 @@ Logs include timestamps, module names, and log levels for easy debugging.
 
 ## Future Enhancements
 
-- Automated sheet customization based on Jira ticket data
-  - Platform-specific tab management
+- Additional sheet customization based on Jira ticket data
   - Metric insertion from ticket descriptions
   - Requirements extraction and insertion
   - Custom attributes handling
+  - Dynamic tab hiding based on platform
 - Webhook signature verification for security
 - Support for multiple Jira projects/workflows
 - Customizable sheet templates per project
