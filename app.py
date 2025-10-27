@@ -266,10 +266,11 @@ def create_qa_test_plan(issue_key):
         # Customize the sheet with goals if any exist
         if goals:
             try:
+                logger.info(f"Starting sheet customization with {len(goals)} goals for platform {platform}")
                 sheet_customizer.customize_sheet_with_goals(sheet_id, platform, goals)
-                logger.info(f"Successfully customized sheet with {len(goals)} goals")
+                logger.info(f"Successfully customized sheet with {len(goals)} goals in {platform}")
             except Exception as e:
-                logger.error(f"Failed to customize sheet with goals: {e}")
+                logger.error(f"Failed to customize sheet with goals: {e}", exc_info=True)
                 # Continue anyway - sheet was created successfully
         else:
             # Post warning to Jira if no goals found

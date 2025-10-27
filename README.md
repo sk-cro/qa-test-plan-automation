@@ -1,10 +1,10 @@
 # QA Test Plan Automation
 
-A serverless Python application that automatically generates QA test plans in Google Sheets when a Jira ticket is moved to "Ready for QA" status.
+A serverless Python application that automatically generates QA test plans in Google Sheets when Universal ticket is moved to "Selected For Development" status.
 
 ## Features
 
-- **Automated Workflow**: Triggered by Jira webhooks when tickets move to "Ready for QA"
+- **Automated Workflow**: Triggered by Jira webhooks when tickets move to "Selected For Development"
 - **Google Sheets Integration**: Creates test plan sheets from a template
 - **Goals Field Parsing**: Automatically parses numbered goals from Jira "Goals" field
 - **Platform Detection**: Identifies testing platform (Convert, Optimizely, or VWO) from Jira labels
@@ -158,12 +158,12 @@ curl http://localhost:5000/health
 2. Create a new webhook
 3. Set URL to your deployed endpoint (e.g., `https://your-domain.com/webhook`)
 4. Select event: "Issue → updated"
-5. Configure JQL filter (optional): `status changed to "Ready for QA"`
+5. Configure JQL filter (optional): `status changed to "Selected For Development"`
 6. Save the webhook
 
 ## Workflow
 
-1. **Trigger**: Jira ticket status changes to "Ready for QA"
+1. **Trigger**: Jira ticket status changes to "Selected For Development"
 2. **Webhook**: Jira sends POST request to `/webhook` endpoint
 3. **Duplicate Check**: Checks if a test plan already exists for the ticket
 4. **Authentication**: Application authenticates with Google APIs

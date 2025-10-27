@@ -88,6 +88,7 @@ class SheetCustomizer:
             
             # Now insert the goal content into Column B
             range_name = f"'{tab_name}'!B28:B{27 + num_goals}"
+            logger.info(f"Inserting goal content into {range_name}")
             
             # Prepare the values - each goal goes into its own row
             values = [[goal] for goal in goals]
@@ -103,7 +104,7 @@ class SheetCustomizer:
                 body=body
             ).execute()
             
-            logger.info(f"Successfully inserted {num_goals} goals into {tab_name}")
+            logger.info(f"Successfully inserted {num_goals} goals into {tab_name} starting at B28")
             return True
             
         except Exception as e:

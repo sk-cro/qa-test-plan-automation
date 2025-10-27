@@ -38,6 +38,7 @@ class JiraTicketParser:
             labels = issue_data.get('fields', {}).get('labels', [])
             
             # Check for exact matches in labels (case-insensitive)
+            logger.info(f"Checking {len(labels)} labels for platform: {labels}")
             for label in labels:
                 label_lower = label.lower().strip()
                 
@@ -52,7 +53,7 @@ class JiraTicketParser:
                     return "[VWO] QA Pass 1"
             
             # No match found, default to Optimizely
-            logger.info(f"No platform label found, defaulting to [Optimizely] QA Pass 1")
+            logger.info(f"No matching platform label found in {labels}, defaulting to [Optimizely] QA Pass 1")
             return "[Optimizely] QA Pass 1"
             
         except Exception as e:
@@ -93,8 +94,9 @@ class JiraTicketParser:
                     # Strip the "1. " "2. " etc. prefix before inserting
                     goal_text = re.sub(r'^\d+\.\s+', '', goal_text)
                     goals.append(goal_text)
+                    logger.debug(f"Parsed goal: {goal_text[:100]}...")
             
-            logger.info(f"Parsed {len(goals)} goals from Goals field")
+            logger.info(f"Successfully parsed {len(goals)} goals from Goals field")
             return goals
             
         except Exception as e:
