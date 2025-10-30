@@ -86,30 +86,34 @@ class SheetCustomizer:
             }
             start_row = start_row_by_platform.get(platform_token, 28)
             num_goals = len(goals)
-            logger.info(f"Inserting {num_goals} rows starting at row {start_row}")
+            placeholder_capacity = 3  # existing placeholder rows in each platform tab
+            rows_to_insert = max(0, num_goals - placeholder_capacity)
+            logger.info(
+                f"Preparing space for {num_goals} goals at row {start_row} with {placeholder_capacity} placeholders; inserting {rows_to_insert} additional row(s)"
+            )
             
-            # Insert all rows at once using batchUpdate
-            requests = [{
-                'insertDimension': {
-                    'range': {
-                        'sheetId': tab_id,
-                        'dimension': 'ROWS',
-                        'startIndex': start_row - 1,  # 0-based index
-                        'endIndex': (start_row - 1) + num_goals
+            # Insert only rows beyond placeholder capacity
+            if rows_to_insert > 0:
+                requests = [{
+                    'insertDimension': {
+                        'range': {
+                            'sheetId': tab_id,
+                            'dimension': 'ROWS',
+                            'startIndex': (start_row - 1) + placeholder_capacity,
+                            'endIndex': (start_row - 1) + placeholder_capacity + rows_to_insert
+                        }
                     }
-                }
-            }]
-            
-            # Execute the insert
-            self.sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=sheet_id,
-                body={'requests': requests}
-            ).execute()
-            
-            logger.info(f"Successfully inserted {num_goals} rows")
+                }]
+                self.sheets_service.spreadsheets().batchUpdate(
+                    spreadsheetId=sheet_id,
+                    body={'requests': requests}
+                ).execute()
+                logger.info(f"Inserted {rows_to_insert} additional row(s) after placeholders")
+            else:
+                logger.info("No additional rows inserted; placeholders cover all goals")
             
             # Now insert the goal content into Column B
-            range_name = f"'{tab_name}'!B{start_row}:B{(start_row - 1) + num_goals}"
+            range_name = f"'{tab_name}'!B{start_row}:B{start_row + num_goals - 1}"
             logger.info(f"Inserting goal content into {range_name}")
             
             # Prepare the values - each goal goes into its own row
