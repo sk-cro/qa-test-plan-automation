@@ -112,6 +112,36 @@ class SheetCustomizer:
             else:
                 logger.info("No additional rows inserted; placeholders cover all goals")
             
+            # Copy formats, formulas, and validations from the template row (start_row)
+            # into the C:L columns for all goal rows so columns behave as expected
+            copy_source = {
+                'sheetId': tab_id,
+                'startRowIndex': start_row - 1,
+                'endRowIndex': start_row,  # single row
+                'startColumnIndex': 2,     # column C (0-based)
+                'endColumnIndex': 12       # column L exclusive
+            }
+            copy_destination = {
+                'sheetId': tab_id,
+                'startRowIndex': start_row - 1,
+                'endRowIndex': start_row - 1 + num_goals,
+                'startColumnIndex': 2,
+                'endColumnIndex': 12
+            }
+
+            copy_requests = [
+                { 'copyPaste': { 'source': copy_source, 'destination': copy_destination, 'pasteType': 'PASTE_FORMAT', 'pasteOrientation': 'NORMAL' } },
+                { 'copyPaste': { 'source': copy_source, 'destination': copy_destination, 'pasteType': 'PASTE_DATA_VALIDATION', 'pasteOrientation': 'NORMAL' } },
+                { 'copyPaste': { 'source': copy_source, 'destination': copy_destination, 'pasteType': 'PASTE_CONDITIONAL_FORMATTING', 'pasteOrientation': 'NORMAL' } },
+                { 'copyPaste': { 'source': copy_source, 'destination': copy_destination, 'pasteType': 'PASTE_FORMULA', 'pasteOrientation': 'NORMAL' } },
+            ]
+
+            self.sheets_service.spreadsheets().batchUpdate(
+                spreadsheetId=sheet_id,
+                body={'requests': copy_requests}
+            ).execute()
+            logger.info("Copied C:L formats/validations/formulas to goal rows")
+
             # Now insert the goal content into Column B
             range_name = f"'{tab_name}'!B{start_row}:B{start_row + num_goals - 1}"
             logger.info(f"Inserting goal content into {range_name}")
