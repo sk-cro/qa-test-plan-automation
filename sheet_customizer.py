@@ -164,13 +164,20 @@ class SheetCustomizer:
             self.initialize_service()
             logger.info(f"Pruning platform tabs in sheet {sheet_id}; keeping '{selected_platform_tab}' and 'Complexity & Risk'")
 
-            # Known platform tab titles
-            platform_tabs = {
-                "[Optimizely] QA Pass 1",
-                "[Convert] QA Pass 1",
-                "[VWO] QA Pass 1",
-                "[Monetate] QA Pass 1",
-            }
+            # Known platform tokens and typical titles
+            platform_tokens = [
+                "[Optimizely]",
+                "[Convert]",
+                "[VWO]",
+                "[Monetate]",
+            ]
+
+            # Derive a robust identifier for the selected platform
+            selected_token = None
+            for token in platform_tokens:
+                if token.lower() in selected_platform_tab.lower():
+                    selected_token = token
+                    break
 
             # Fetch spreadsheet metadata
             spreadsheet = self.sheets_service.spreadsheets().get(
@@ -181,6 +188,22 @@ class SheetCustomizer:
             sheets = spreadsheet.get('sheets', [])
             delete_requests = []
 
+            # Determine if the selected platform tab actually exists; if not, skip pruning
+            selected_exists = False
+            for sheet in sheets:
+                title = sheet.get('properties', {}).get('title', '')
+                if title == selected_platform_tab or (
+                    selected_token and selected_token.lower() in title.lower()
+                ):
+                    selected_exists = True
+                    break
+
+            if not selected_exists:
+                logger.warning(
+                    f"Selected platform tab '{selected_platform_tab}' not found; skipping platform tab pruning to avoid deleting all tabs"
+                )
+                return True
+
             for sheet in sheets:
                 props = sheet.get('properties', {})
                 title = props.get('title')
@@ -190,8 +213,11 @@ class SheetCustomizer:
                 if title == selected_platform_tab or title == "Complexity & Risk":
                     continue
 
-                # Delete any other platform tabs we recognize
-                if title in platform_tabs:
+                # Delete any other platform tabs we recognize via token matching
+                is_platform_tab = any(token.lower() in title.lower() for token in platform_tokens)
+                is_selected_platform_tab = selected_token and (selected_token.lower() in title.lower())
+
+                if is_platform_tab and not is_selected_platform_tab:
                     logger.info(f"Scheduling deletion of tab '{title}' (id={sheet_id_to_delete})")
                     delete_requests.append({
                         'deleteSheet': {
