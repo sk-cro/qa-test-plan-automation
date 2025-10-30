@@ -280,6 +280,14 @@ def create_qa_test_plan(issue_key):
                 logger.info(f"Warning posted to Jira for {issue_key}")
             except Exception as comment_error:
                 logger.error(f"Failed to post warning to Jira: {comment_error}")
+
+        # Prune other platform tabs while keeping the selected platform and Complexity & Risk
+        try:
+            logger.info(f"Pruning platform tabs; keeping '{platform}' and 'Complexity & Risk'")
+            sheet_customizer.prune_platform_tabs(sheet_id, platform)
+        except Exception as prune_error:
+            # Log but do not fail the operation
+            logger.error(f"Failed to prune platform tabs: {prune_error}")
         
         # Post comment to Jira
         try:

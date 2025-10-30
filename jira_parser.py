@@ -27,8 +27,9 @@ class JiraTicketParser:
             issue_key (str): The Jira issue key (e.g., "MTP-1234").
             
         Returns:
-            str: Tab name matching the platform ("[Optimizely] QA Pass 1", "[Convert] QA Pass 1", or "[VWO] QA Pass 1").
-                 Defaults to "[Optimizely] QA Pass 1" if no match found.
+            str: Tab name matching the platform ("[Optimizely] QA Pass 1", "[Convert] QA Pass 1",
+                 "[VWO] QA Pass 1", or "[Monetate] QA Pass 1"). Defaults to
+                 "[Optimizely] QA Pass 1" if no match found.
         """
         try:
             logger.info(f"Extracting platform from labels for issue: {issue_key}")
@@ -51,6 +52,9 @@ class JiraTicketParser:
                 elif label_lower == 'vwo':
                     logger.info(f"Found VWO platform from label: {label}")
                     return "[VWO] QA Pass 1"
+                elif label_lower == 'monetate':
+                    logger.info(f"Found Monetate platform from label: {label}")
+                    return "[Monetate] QA Pass 1"
             
             # No match found, default to Optimizely
             logger.info(f"No matching platform label found in {labels}, defaulting to [Optimizely] QA Pass 1")

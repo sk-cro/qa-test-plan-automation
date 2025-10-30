@@ -147,6 +147,76 @@ class SheetCustomizer:
         except HttpError as e:
             logger.error(f"Failed to get tab ID: {e}")
             raise
+
+    def prune_platform_tabs(self, sheet_id: str, selected_platform_tab: str) -> bool:
+        """
+        Delete all platform-specific tabs except the selected one and always keep
+        the "Complexity & Risk" tab.
+        
+        Args:
+            sheet_id (str): Spreadsheet ID.
+            selected_platform_tab (str): The tab title to keep, e.g., "[Optimizely] QA Pass 1".
+        
+        Returns:
+            bool: True if pruning completed successfully (no-op counts as success).
+        """
+        try:
+            self.initialize_service()
+            logger.info(f"Pruning platform tabs in sheet {sheet_id}; keeping '{selected_platform_tab}' and 'Complexity & Risk'")
+
+            # Known platform tab titles
+            platform_tabs = {
+                "[Optimizely] QA Pass 1",
+                "[Convert] QA Pass 1",
+                "[VWO] QA Pass 1",
+                "[Monetate] QA Pass 1",
+            }
+
+            # Fetch spreadsheet metadata
+            spreadsheet = self.sheets_service.spreadsheets().get(
+                spreadsheetId=sheet_id,
+                includeGridData=False
+            ).execute()
+
+            sheets = spreadsheet.get('sheets', [])
+            delete_requests = []
+
+            for sheet in sheets:
+                props = sheet.get('properties', {})
+                title = props.get('title')
+                sheet_id_to_delete = props.get('sheetId')
+
+                # Never delete the selected platform tab or the Complexity & Risk tab
+                if title == selected_platform_tab or title == "Complexity & Risk":
+                    continue
+
+                # Delete any other platform tabs we recognize
+                if title in platform_tabs:
+                    logger.info(f"Scheduling deletion of tab '{title}' (id={sheet_id_to_delete})")
+                    delete_requests.append({
+                        'deleteSheet': {
+                            'sheetId': sheet_id_to_delete
+                        }
+                    })
+
+            if not delete_requests:
+                logger.info("No platform tabs to delete; pruning is a no-op")
+                return True
+
+            self.sheets_service.spreadsheets().batchUpdate(
+                spreadsheetId=sheet_id,
+                body={'requests': delete_requests}
+            ).execute()
+
+            logger.info(f"Successfully pruned {len(delete_requests)} platform tab(s)")
+            return True
+
+        except HttpError as e:
+            logger.error(f"Failed to prune platform tabs: {e}")
+            raise Exception(f"Failed to prune platform tabs: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error pruning platform tabs: {e}")
+            raise
         except Exception as e:
             logger.error(f"Unexpected error getting tab ID: {e}")
             raise
