@@ -129,12 +129,12 @@ In Railway dashboard, find your deployed service URL (Settings → Domains)
 5. URL: `https://your-app.up.railway.app/webhook`
 6. Events to trigger:
    - Issue → updated
-7. JQL Filter (optional): `status changed to "Ready for QA"`
+7. JQL Filter (optional): `status changed to "Selected For Development"`
 8. Click "Create"
 
 ### Step 3: Test the Integration
 
-1. Move a Jira ticket to "Ready for QA" status
+1. Move a Jira ticket to "Selected For Development" status
 2. Check Railway logs for activity
 3. Verify Google Sheet was created
 4. Check Jira ticket for comment with sheet URL

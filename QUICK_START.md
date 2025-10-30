@@ -70,7 +70,7 @@ cat token.json
    - **Status**: ✅ Enabled
    - **URL**: `https://your-railway-app.up.railway.app/webhook`
    - **Events**: Issue → updated
-   - **JQL**: (optional) `status changed to "Ready for QA"`
+   - **JQL**: (optional) `status changed to "Selected For Development"`
 4. Click **"Create"**
 
 ---
@@ -99,7 +99,7 @@ Replace `MTP-1234` with a real Jira issue key.
 ### Test 3: Real Workflow
 1. Go to Jira
 2. Find or create a ticket
-3. Move it to **"Ready for QA"** status
+3. Move it to **"Selected For Development"** status
 4. Check:
    - ✅ Railway logs show activity
    - ✅ New Google Sheet created in your folder
@@ -143,7 +143,7 @@ python app.py
 - Check Railway logs when moving a ticket
 - Test with `/test-create` endpoint first
 
-### "Ready for QA" Not Triggering
+### "Selected For Development" Not Triggering
 - Verify webhook JQL filter in Jira
 - Check the exact status name in Jira (case-sensitive)
 - Look at webhook logs in Jira Settings → WebHooks
@@ -184,7 +184,7 @@ git push origin main
 
 ## ✨ You're All Set!
 
-Your QA automation is live! Every time a ticket moves to "Ready for QA", a test plan sheet will be automatically created and linked in Jira.
+Your QA automation is live! Every time a ticket moves to "Selected For Development", a test plan sheet will be automatically created and linked in Jira.
 
 **GitHub**: https://github.com/sk-cro/qa-test-plan-automation
 **Railway**: https://railway.app (your dashboard)
