@@ -142,7 +142,7 @@ def jira_webhook():
     """
     Main webhook endpoint for Jira events.
     
-    Triggered when a Jira ticket is moved to "Ready for QA" status.
+    Triggered when a Jira ticket is moved to "Selected For Development" status.
     Creates a QA test plan Google Sheet and posts a comment back to Jira.
     
     Returns:
@@ -182,29 +182,29 @@ def jira_webhook():
                 'allowed_projects': Config.ALLOWED_PROJECTS
             }), 200
         
-        # Check if status changed to "Ready for QA"
+        # Check if status changed to "Selected For Development"
         changelog = payload.get('changelog', {})
         items = changelog.get('items', [])
         
-        status_changed_to_qa = False
+        status_changed_to_sfd = False
         for item in items:
             if item.get('field') == 'status':
                 from_status = item.get('fromString', '').strip()
                 to_status = item.get('toString', '').strip()
                 
-                # Check if this is actually a status change TO "Ready for QA"
-                # and NOT from "Ready for QA" (to prevent loops)
-                if (to_status.lower() == 'ready for qa' and 
-                    from_status.lower() != 'ready for qa'):
-                    status_changed_to_qa = True
+                # Check if this is actually a status change TO "Selected For Development"
+                # and NOT from the same (to prevent loops)
+                if (to_status.lower() == 'selected for development' and 
+                    from_status.lower() != 'selected for development'):
+                    status_changed_to_sfd = True
                     logger.info(f"Status change detected: '{from_status}' → '{to_status}'")
                     break
         
-        if not status_changed_to_qa:
-            logger.info(f"Issue {issue_key} - No valid status change to 'Ready for QA' detected, ignoring")
-            return jsonify({'message': 'Status not changed to Ready for QA'}), 200
+        if not status_changed_to_sfd:
+            logger.info(f"Issue {issue_key} - No valid status change to 'Selected For Development' detected, ignoring")
+            return jsonify({'message': 'Status not changed to Selected For Development'}), 200
         
-        logger.info(f"Processing issue {issue_key} - Status changed to 'Ready for QA'")
+        logger.info(f"Processing issue {issue_key} - Status changed to 'Selected For Development'")
         
         # Create QA test plan
         result = create_qa_test_plan(issue_key)

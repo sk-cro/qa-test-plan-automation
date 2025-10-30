@@ -48,7 +48,7 @@ PGM requested bounce rate tracking.
             "items": [
                 {
                     "field": "status",
-                    "toString": "Ready for QA"
+                    "toString": "Selected For Development"
                 }
             ]
         }
