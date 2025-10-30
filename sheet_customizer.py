@@ -56,11 +56,27 @@ class SheetCustomizer:
                 logger.info("No non-empty goals after filtering, skipping customization")
                 return True
             
-            # Find the tab ID
+            # Find the tab ID; if missing, try to resolve by token, or create it by duplicating an existing platform tab
             tab_id = self._get_tab_id(sheet_id, tab_name)
             if tab_id is None:
-                logger.error(f"Tab '{tab_name}' not found in sheet")
-                raise Exception(f"Tab '{tab_name}' not found in sheet")
+                # Try token-based resolution (e.g., "[Monetate]")
+                token = self._extract_platform_token(tab_name)
+                if token:
+                    resolved_title, resolved_id = self._find_platform_tab_by_token(sheet_id, token)
+                    if resolved_id is not None:
+                        logger.info(f"Resolved requested tab '{tab_name}' to existing tab '{resolved_title}' (id={resolved_id})")
+                        tab_name = resolved_title
+                        tab_id = resolved_id
+                
+            if tab_id is None:
+                # As a last resort, duplicate an existing platform tab and rename to the requested title
+                logger.info(f"Requested tab '{tab_name}' not present; attempting to create it by duplicating an existing platform tab")
+                template_id = self._select_platform_template_tab_id(sheet_id)
+                if template_id is None:
+                    logger.error("Could not find any platform tab to duplicate")
+                    raise Exception(f"Tab '{tab_name}' not found in sheet")
+                tab_id = self._duplicate_tab(sheet_id, template_id, tab_name)
+                logger.info(f"Created new tab '{tab_name}' with id {tab_id} from template {template_id}")
             
             # Insert rows starting at row 28
             num_goals = len(goals)
@@ -147,6 +163,71 @@ class SheetCustomizer:
         except HttpError as e:
             logger.error(f"Failed to get tab ID: {e}")
             raise
+
+    def _extract_platform_token(self, tab_title: str) -> str:
+        """Return the bracketed platform token (e.g., "[Monetate]") from a tab title if present."""
+        try:
+            if not tab_title:
+                return ""
+            start = tab_title.find('[')
+            end = tab_title.find(']')
+            if start != -1 and end != -1 and end > start:
+                return tab_title[start:end+1]
+            return ""
+        except Exception:
+            return ""
+
+    def _find_platform_tab_by_token(self, sheet_id: str, token: str):
+        """Find an existing tab whose title contains the given token (case-insensitive)."""
+        spreadsheet = self.sheets_service.spreadsheets().get(
+            spreadsheetId=sheet_id,
+            includeGridData=False
+        ).execute()
+        for sheet in spreadsheet.get('sheets', []):
+            title = sheet.get('properties', {}).get('title', '')
+            if token and token.lower() in title.lower():
+                return title, sheet.get('properties', {}).get('sheetId')
+        return None, None
+
+    def _select_platform_template_tab_id(self, sheet_id: str):
+        """Choose a reasonable existing platform tab to duplicate as a template."""
+        spreadsheet = self.sheets_service.spreadsheets().get(
+            spreadsheetId=sheet_id,
+            includeGridData=False
+        ).execute()
+        platform_tokens = ["[Optimizely]", "[Convert]", "[VWO]", "[Monetate]"]
+        preferred_order = ["[Monetate]", "[Optimizely]", "[Convert]", "[VWO]"]
+        # Try preferred order first
+        for pref in preferred_order:
+            for sheet in spreadsheet.get('sheets', []):
+                title = sheet.get('properties', {}).get('title', '')
+                if pref.lower() in title.lower():
+                    return sheet.get('properties', {}).get('sheetId')
+        # Fallback to any platform token
+        for sheet in spreadsheet.get('sheets', []):
+            title = sheet.get('properties', {}).get('title', '')
+            if any(tok.lower() in title.lower() for tok in platform_tokens):
+                return sheet.get('properties', {}).get('sheetId')
+        return None
+
+    def _duplicate_tab(self, sheet_id: str, source_sheet_id: int, new_title: str) -> int:
+        """Duplicate a sheet tab and rename it to new_title; return the new sheetId."""
+        requests = [{
+            'duplicateSheet': {
+                'sourceSheetId': source_sheet_id,
+                'insertSheetIndex': 0,
+                'newSheetName': new_title
+            }
+        }]
+        response = self.sheets_service.spreadsheets().batchUpdate(
+            spreadsheetId=sheet_id,
+            body={'requests': requests}
+        ).execute()
+        replies = response.get('replies', [])
+        if replies and 'duplicateSheet' in replies[0]:
+            return replies[0]['duplicateSheet']['properties']['sheetId']
+        # If API did not return new id, try to look it up by title
+        return self._get_tab_id(sheet_id, new_title)
 
     def prune_platform_tabs(self, sheet_id: str, selected_platform_tab: str) -> bool:
         """
