@@ -76,9 +76,17 @@ class SheetCustomizer:
                 )
                 raise Exception(f"Tab '{tab_name}' not found in sheet")
             
-            # Insert rows starting at row 28
+            # Determine starting row per platform
+            platform_token = self._extract_platform_token(tab_name).lower()
+            start_row_by_platform = {
+                '[monetate]': 23,
+                '[vwo]': 26,
+                '[convert]': 27,
+                '[optimizely]': 28,
+            }
+            start_row = start_row_by_platform.get(platform_token, 28)
             num_goals = len(goals)
-            logger.info(f"Inserting {num_goals} rows starting at row 28")
+            logger.info(f"Inserting {num_goals} rows starting at row {start_row}")
             
             # Insert all rows at once using batchUpdate
             requests = [{
@@ -86,8 +94,8 @@ class SheetCustomizer:
                     'range': {
                         'sheetId': tab_id,
                         'dimension': 'ROWS',
-                        'startIndex': 27,  # Row 28 (0-based index)
-                        'endIndex': 27 + num_goals
+                        'startIndex': start_row - 1,  # 0-based index
+                        'endIndex': (start_row - 1) + num_goals
                     }
                 }
             }]
@@ -101,7 +109,7 @@ class SheetCustomizer:
             logger.info(f"Successfully inserted {num_goals} rows")
             
             # Now insert the goal content into Column B
-            range_name = f"'{tab_name}'!B28:B{27 + num_goals}"
+            range_name = f"'{tab_name}'!B{start_row}:B{(start_row - 1) + num_goals}"
             logger.info(f"Inserting goal content into {range_name}")
             
             # Prepare the values - each goal goes into its own row
