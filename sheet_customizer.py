@@ -173,7 +173,7 @@ class SheetCustomizer:
     
     def _apply_first_line_bold_formatting(self, sheet_id: str, tab_id: int, start_row: int, num_goals: int, goals: List[str]) -> None:
         """
-        Apply bold formatting to the first line of each goal in column B.
+        Apply bold formatting to the first line of each goal in column B using richTextValue.
         
         Args:
             sheet_id (str): ID of the Google Sheet.
@@ -183,63 +183,48 @@ class SheetCustomizer:
             goals (list): List of goal strings.
         """
         try:
-            # Build updateCells requests for goals that have multiple lines
-            rows_to_format = []
+            # Build updateCells requests using richTextValue for partial formatting
+            format_requests = []
             
             for i, goal in enumerate(goals):
                 if not goal.strip():
                     continue
-                    
-                # Check if goal has a newline (indicating multiple lines)
-                if '\n' in goal:
-                    first_newline_index = goal.find('\n')
-                    if first_newline_index > 0:
-                        # Create text format runs: bold from start to first newline, then normal
-                        # Format runs apply from startIndex to the next run's startIndex (or end of text)
-                        text_format_runs = [
-                            {
-                                'startIndex': 0,
-                                'format': {'bold': True}
-                            },
-                            {
-                                'startIndex': first_newline_index,
-                                'format': {'bold': False}
-                            }
-                        ]
-                        rows_to_format.append({
-                            'row_index': i,
-                            'format_runs': text_format_runs
-                        })
-                        logger.debug(f"Prepared bold formatting for goal {i+1}: first {first_newline_index} characters (first line)")
-                else:
-                    # Single line goal - bold the entire text (it's the "first line")
-                    text_format_runs = [
-                        {
-                            'startIndex': 0,
-                            'format': {'bold': True}
-                        }
-                    ]
-                    rows_to_format.append({
-                        'row_index': i,
-                        'format_runs': text_format_runs
-                    })
-                    logger.debug(f"Prepared bold formatting for single-line goal {i+1}")
-            
-            if not rows_to_format:
-                logger.info("No goals with multiple lines found, skipping bold formatting")
-                return
-            
-            # Group rows by consecutive format runs for efficiency
-            # For now, we'll create individual updateCells requests for each row
-            # This is safe and ensures we don't affect other cells
-            format_requests = []
-            
-            for row_info in rows_to_format:
-                row_index = row_info['row_index']
-                format_runs = row_info['format_runs']
                 
                 # Column B is index 1 (0-based)
-                cell_row = start_row - 1 + row_index  # Convert to 0-based
+                cell_row = start_row - 1 + i  # Convert to 0-based
+                
+                # Check if goal has a newline (indicating multiple lines)
+                if '\n' in goal:
+                    # Split at first newline to separate first line from rest
+                    first_newline_index = goal.find('\n')
+                    first_line = goal[:first_newline_index]
+                    remaining_text = goal[first_newline_index:]  # Includes the newline
+                    
+                    # Create richTextValue with two segments: bold first line, normal rest
+                    rich_text_value = {
+                        'values': [
+                            {
+                                'text': first_line,
+                                'textFormat': {'bold': True}
+                            },
+                            {
+                                'text': remaining_text,
+                                'textFormat': {'bold': False}
+                            }
+                        ]
+                    }
+                    logger.debug(f"Prepared bold formatting for goal {i+1}: first line ({len(first_line)} chars) bold, rest normal")
+                else:
+                    # Single line goal - bold the entire text (it's the "first line")
+                    rich_text_value = {
+                        'values': [
+                            {
+                                'text': goal,
+                                'textFormat': {'bold': True}
+                            }
+                        ]
+                    }
+                    logger.debug(f"Prepared bold formatting for single-line goal {i+1}")
                 
                 format_requests.append({
                     'updateCells': {
@@ -252,12 +237,12 @@ class SheetCustomizer:
                         },
                         'rows': [{
                             'values': [{
-                                'userEnteredFormat': {
-                                    'textFormatRuns': format_runs
+                                'userEnteredValue': {
+                                    'richTextValue': rich_text_value
                                 }
                             }]
                         }],
-                        'fields': 'userEnteredFormat.textFormatRuns'
+                        'fields': 'userEnteredValue.richTextValue'
                     }
                 })
             
