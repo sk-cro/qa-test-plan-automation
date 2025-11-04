@@ -160,12 +160,121 @@ class SheetCustomizer:
                 body=body
             ).execute()
             
-            logger.info(f"Successfully inserted {num_goals} goals into {tab_name} starting at B28")
+            logger.info(f"Successfully inserted {num_goals} goals into {tab_name} starting at row {start_row}")
+            
+            # Apply bold formatting to the first line of each goal
+            self._apply_first_line_bold_formatting(sheet_id, tab_id, start_row, num_goals, goals)
+            
             return True
             
         except Exception as e:
             logger.error(f"Failed to customize sheet {sheet_id}: {e}")
             raise
+    
+    def _apply_first_line_bold_formatting(self, sheet_id: str, tab_id: int, start_row: int, num_goals: int, goals: List[str]) -> None:
+        """
+        Apply bold formatting to the first line of each goal in column B.
+        
+        Args:
+            sheet_id (str): ID of the Google Sheet.
+            tab_id (int): ID of the tab.
+            start_row (int): Starting row number (1-based).
+            num_goals (int): Number of goals to format.
+            goals (list): List of goal strings.
+        """
+        try:
+            # Build updateCells requests for goals that have multiple lines
+            rows_to_format = []
+            
+            for i, goal in enumerate(goals):
+                if not goal.strip():
+                    continue
+                    
+                # Check if goal has a newline (indicating multiple lines)
+                if '\n' in goal:
+                    first_newline_index = goal.find('\n')
+                    if first_newline_index > 0:
+                        # Create text format runs: bold from start to first newline, then normal
+                        # Format runs apply from startIndex to the next run's startIndex (or end of text)
+                        text_format_runs = [
+                            {
+                                'startIndex': 0,
+                                'format': {'bold': True}
+                            },
+                            {
+                                'startIndex': first_newline_index,
+                                'format': {'bold': False}
+                            }
+                        ]
+                        rows_to_format.append({
+                            'row_index': i,
+                            'format_runs': text_format_runs
+                        })
+                        logger.debug(f"Prepared bold formatting for goal {i+1}: first {first_newline_index} characters (first line)")
+                else:
+                    # Single line goal - bold the entire text (it's the "first line")
+                    text_format_runs = [
+                        {
+                            'startIndex': 0,
+                            'format': {'bold': True}
+                        }
+                    ]
+                    rows_to_format.append({
+                        'row_index': i,
+                        'format_runs': text_format_runs
+                    })
+                    logger.debug(f"Prepared bold formatting for single-line goal {i+1}")
+            
+            if not rows_to_format:
+                logger.info("No goals with multiple lines found, skipping bold formatting")
+                return
+            
+            # Group rows by consecutive format runs for efficiency
+            # For now, we'll create individual updateCells requests for each row
+            # This is safe and ensures we don't affect other cells
+            format_requests = []
+            
+            for row_info in rows_to_format:
+                row_index = row_info['row_index']
+                format_runs = row_info['format_runs']
+                
+                # Column B is index 1 (0-based)
+                cell_row = start_row - 1 + row_index  # Convert to 0-based
+                
+                format_requests.append({
+                    'updateCells': {
+                        'range': {
+                            'sheetId': tab_id,
+                            'startRowIndex': cell_row,
+                            'endRowIndex': cell_row + 1,
+                            'startColumnIndex': 1,  # Column B (0-based)
+                            'endColumnIndex': 2     # End of column B (exclusive)
+                        },
+                        'rows': [{
+                            'values': [{
+                                'userEnteredFormat': {
+                                    'textFormatRuns': format_runs
+                                }
+                            }]
+                        }],
+                        'fields': 'userEnteredFormat.textFormatRuns'
+                    }
+                })
+            
+            if format_requests:
+                self.sheets_service.spreadsheets().batchUpdate(
+                    spreadsheetId=sheet_id,
+                    body={'requests': format_requests}
+                ).execute()
+                logger.info(f"Applied bold formatting to first line of {len(format_requests)} goal(s)")
+            else:
+                logger.info("No formatting requests to apply")
+                
+        except Exception as e:
+            # Log error but don't fail the entire operation
+            # The goals were inserted successfully, formatting is just a nice-to-have
+            logger.warning(f"Failed to apply bold formatting to first lines: {e}")
+            # Don't raise - this is a non-critical enhancement
     
     def _get_tab_id(self, sheet_id: str, tab_name: str) -> int:
         """
