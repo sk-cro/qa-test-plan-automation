@@ -293,7 +293,9 @@ def create_qa_test_plan(issue_key):
                     logger.info(f"Found {len(custom_attributes)} custom attributes for Optimizely ticket")
                     try:
                         # Adjust start_row based on how many rows Goals inserted
-                        # Original row 34 + rows inserted by Goals
+                        # When Goals inserts rows, everything from that insertion point down shifts
+                        # Goals starts at row 28, inserts rows after the 3 placeholders (at row 31)
+                        # So original row 34 shifts down by goals_rows_inserted
                         adjusted_start_row = 34 + goals_rows_inserted
                         logger.info(f"Custom attributes start row adjusted from 34 to {adjusted_start_row} (Goals inserted {goals_rows_inserted} rows)")
                         
