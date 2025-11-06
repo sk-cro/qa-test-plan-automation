@@ -237,15 +237,22 @@ class SheetCustomizer:
                 f"Preparing space for {num_attributes} custom attributes at row {start_row} with {placeholder_capacity} placeholders; inserting {rows_to_insert} additional row(s)"
             )
             
-            # Insert only rows beyond placeholder capacity
+            # CRITICAL FIX: Insert rows AFTER the placeholder rows to shift content below down
+            # This prevents overwriting content like "Screenshots" that comes after Custom attributes
+            # We insert at the position after the last placeholder row
             if rows_to_insert > 0:
+                # Insert rows starting after the placeholder rows (start_row + placeholder_capacity)
+                # This shifts all content below (like Screenshots) down BEFORE we write
+                insert_start_index = (start_row - 1) + placeholder_capacity  # 0-based index
+                insert_end_index = insert_start_index + rows_to_insert
+                
                 requests = [{
                     'insertDimension': {
                         'range': {
                             'sheetId': tab_id,
                             'dimension': 'ROWS',
-                            'startIndex': (start_row - 1) + placeholder_capacity,
-                            'endIndex': (start_row - 1) + placeholder_capacity + rows_to_insert
+                            'startIndex': insert_start_index,
+                            'endIndex': insert_end_index
                         }
                     }
                 }]
@@ -253,7 +260,7 @@ class SheetCustomizer:
                     spreadsheetId=sheet_id,
                     body={'requests': requests}
                 ).execute()
-                logger.info(f"Inserted {rows_to_insert} additional row(s) after placeholders for custom attributes")
+                logger.info(f"Inserted {rows_to_insert} additional row(s) starting at index {insert_start_index} (row {insert_start_index + 1}) to shift content below before writing custom attributes")
             else:
                 logger.info("No additional rows inserted; placeholders cover all custom attributes")
             
