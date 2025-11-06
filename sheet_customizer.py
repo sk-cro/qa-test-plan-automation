@@ -231,19 +231,28 @@ class SheetCustomizer:
                 logger.warning(f"Custom attributes should only be used for Optimizely tabs, but tab is: {tab_name}")
             
             num_attributes = len(custom_attributes)
-            placeholder_capacity = 3  # existing placeholder rows in each platform tab
+            # Custom attributes template has only 1 placeholder row (row 34 in template)
+            # Row 35 is empty, row 36 is Screenshots (not a placeholder)
+            # So we only have 1 placeholder row, not 3 like Goals
+            placeholder_capacity = 1  # Only row 34 (start_row) is the template placeholder
+            # Calculate how many rows we need to insert beyond the placeholder capacity
             rows_to_insert = max(0, num_attributes - placeholder_capacity)
             logger.info(
                 f"Preparing space for {num_attributes} custom attributes at row {start_row} with {placeholder_capacity} placeholders; inserting {rows_to_insert} additional row(s)"
             )
             
-            # CRITICAL FIX: Insert rows AFTER the placeholder rows to shift content below down
-            # This prevents overwriting content like "Screenshots" that comes after Custom attributes
-            # We insert at the position after the last placeholder row
+            # CRITICAL FIX: Insert rows starting right after the template row to shift content below
+            # Template structure: row 34 = template, row 35 = empty, row 36 = Screenshots
+            # After Goals insertion: row 34→40, row 35→41, row 36→42 (Screenshots)
+            # We need to insert rows starting at row 41 (after the template at row 40) to shift
+            # Screenshots (row 42) and all content below down BEFORE we write Custom attributes
             if rows_to_insert > 0:
-                # Insert rows starting after the placeholder rows (start_row + placeholder_capacity)
-                # This shifts all content below (like Screenshots) down BEFORE we write
-                insert_start_index = (start_row - 1) + placeholder_capacity  # 0-based index
+                # Insert rows starting right after the template row (start_row + placeholder_capacity)
+                # This shifts Screenshots (row 42) and all content below down BEFORE we write
+                # Example: start_row=40, placeholder_capacity=1, so insert at index 40 (row 41)
+                # This shifts row 41+ (including Screenshots at row 42) down by rows_to_insert
+                # Then we write Custom attributes to rows 40-48
+                insert_start_index = (start_row - 1) + placeholder_capacity  # 0-based index (row 41)
                 insert_end_index = insert_start_index + rows_to_insert
                 
                 requests = [{
