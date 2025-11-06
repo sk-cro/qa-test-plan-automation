@@ -219,6 +219,48 @@ class JiraClient:
             logger.error(f"Error fetching Goals field: {e}")
             return ''
     
+    def get_custom_attributes_field(self, issue_key):
+        """
+        Extract the Custom attributes field from a Jira issue.
+        
+        Args:
+            issue_key (str): The Jira issue key (e.g., "MTP-1234").
+            
+        Returns:
+            str: The Custom attributes field text, or empty string if not found.
+        """
+        try:
+            logger.info(f"Fetching Custom attributes field for issue: {issue_key}")
+            
+            # Get the issue data
+            issue_data = self.get_issue(issue_key)
+            fields = issue_data.get('fields', {})
+            
+            # Look for the Custom attributes custom field (customfield_10777)
+            custom_attributes_field = fields.get('customfield_10777')
+            
+            if custom_attributes_field:
+                logger.info(f"Found Custom attributes field in customfield_10777")
+                
+                # Handle different field types
+                if isinstance(custom_attributes_field, str):
+                    return custom_attributes_field
+                elif isinstance(custom_attributes_field, dict):
+                    # Handle ADF document format
+                    if 'content' in custom_attributes_field:
+                        converted_text = self._convert_adf_to_text(custom_attributes_field)
+                        return converted_text
+                    return str(custom_attributes_field)
+                else:
+                    return str(custom_attributes_field) if custom_attributes_field else ''
+            
+            logger.warning(f"No Custom attributes field found for issue: {issue_key}")
+            return ''
+            
+        except Exception as e:
+            logger.error(f"Error fetching Custom attributes field: {e}")
+            return ''
+    
     def _convert_adf_to_text(self, adf_document, depth=0):
         """
         Convert Atlassian Document Format (ADF) to plain text.

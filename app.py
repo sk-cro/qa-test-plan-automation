@@ -264,11 +264,12 @@ def create_qa_test_plan(issue_key):
         logger.info(f"Goals found: {len(goals)}")
         
         # Customize the sheet with goals if any exist
+        goals_rows_inserted = 0  # Track how many rows Goals inserted
         if goals:
             try:
                 logger.info(f"Starting sheet customization with {len(goals)} goals for platform {platform}")
-                sheet_customizer.customize_sheet_with_goals(sheet_id, platform, goals)
-                logger.info(f"Successfully customized sheet with {len(goals)} goals in {platform}")
+                goals_rows_inserted = sheet_customizer.customize_sheet_with_goals(sheet_id, platform, goals)
+                logger.info(f"Successfully customized sheet with {len(goals)} goals in {platform}, inserted {goals_rows_inserted} additional rows")
             except Exception as e:
                 logger.error(f"Failed to customize sheet with goals: {e}", exc_info=True)
                 # Continue anyway - sheet was created successfully
@@ -280,6 +281,33 @@ def create_qa_test_plan(issue_key):
                 logger.info(f"Warning posted to Jira for {issue_key}")
             except Exception as comment_error:
                 logger.error(f"Failed to post warning to Jira: {comment_error}")
+
+        # Custom attributes processing - ONLY for Optimizely tickets
+        # This is a separate check that runs independently of Goals processing
+        if platform == "[Optimizely] QA Pass 1":
+            try:
+                logger.info(f"Checking for Custom attributes field for Optimizely ticket: {issue_key}")
+                custom_attributes = ticket_parser.parse_custom_attributes_field(issue_key)
+                
+                if custom_attributes:
+                    logger.info(f"Found {len(custom_attributes)} custom attributes for Optimizely ticket")
+                    try:
+                        # Adjust start_row based on how many rows Goals inserted
+                        # Original row 34 + rows inserted by Goals
+                        adjusted_start_row = 34 + goals_rows_inserted
+                        logger.info(f"Custom attributes start row adjusted from 34 to {adjusted_start_row} (Goals inserted {goals_rows_inserted} rows)")
+                        
+                        logger.info(f"Starting sheet customization with {len(custom_attributes)} custom attributes for platform {platform}")
+                        sheet_customizer.customize_sheet_with_custom_attributes(sheet_id, platform, custom_attributes, start_row=adjusted_start_row)
+                        logger.info(f"Successfully customized sheet with {len(custom_attributes)} custom attributes in {platform} starting at row {adjusted_start_row}")
+                    except Exception as e:
+                        logger.error(f"Failed to customize sheet with custom attributes: {e}", exc_info=True)
+                        # Continue anyway - sheet was created successfully, custom attributes are optional
+                else:
+                    logger.info(f"No Custom attributes field found or empty for Optimizely ticket: {issue_key}")
+            except Exception as e:
+                logger.error(f"Error processing Custom attributes for Optimizely ticket: {e}", exc_info=True)
+                # Continue anyway - custom attributes processing should not break the main flow
 
         # Prune other platform tabs while keeping the selected platform and Complexity & Risk
         try:

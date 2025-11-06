@@ -106,3 +106,45 @@ class JiraTicketParser:
         except Exception as e:
             logger.error(f"Error parsing Goals field: {e}")
             return []
+    
+    def parse_custom_attributes_field(self, issue_key: str) -> List[str]:
+        """
+        Parse the Custom attributes field from a Jira issue into numbered sections.
+        
+        Args:
+            issue_key (str): The Jira issue key (e.g., "MTP-1234").
+            
+        Returns:
+            list: List of custom attribute strings, each containing all content for that numbered attribute.
+                  Returns empty list if no Custom attributes field found or empty.
+        """
+        try:
+            logger.info(f"Parsing Custom attributes field for issue: {issue_key}")
+            
+            # Get the Custom attributes field text
+            custom_attributes_text = self.jira_client.get_custom_attributes_field(issue_key)
+            
+            if not custom_attributes_text or not custom_attributes_text.strip():
+                logger.info(f"No Custom attributes field found or empty for issue: {issue_key}")
+                return []
+            
+            # Parse numbered custom attributes using reliable regex pattern
+            # Keep the numbering detection but strip prefix before inserting into sheet
+            attribute_pattern = r'(\d+\.\s+.+?)(?=\d+\.\s+|$)'
+            matches = re.findall(attribute_pattern, custom_attributes_text, re.DOTALL)
+            
+            custom_attributes = []
+            for match in matches:
+                attribute_text = match.strip()
+                if attribute_text:
+                    # Strip the "1. " "2. " etc. prefix before inserting
+                    attribute_text = re.sub(r'^\d+\.\s+', '', attribute_text)
+                    custom_attributes.append(attribute_text)
+                    logger.debug(f"Parsed custom attribute: {attribute_text[:100]}...")
+            
+            logger.info(f"Successfully parsed {len(custom_attributes)} custom attributes from Custom attributes field")
+            return custom_attributes
+            
+        except Exception as e:
+            logger.error(f"Error parsing Custom attributes field: {e}")
+            return []
